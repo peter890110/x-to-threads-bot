@@ -80,8 +80,10 @@ def post_to_threads(text, media_urls=None):
         
     except Exception as e:
         print(f"建立 Container 發生錯誤: {e}")
-        # 如果因為圖片連結無效導致失敗，可以考慮降級發純文字
-        # 為了簡化，這裡回傳失敗，下次排程會重試
+        if 'res' in locals() and hasattr(res, 'text'):
+            print(f"Threads API 錯誤詳細資訊: {res.text}")
+        elif 'item_res' in locals() and hasattr(item_res, 'text'):
+            print(f"Threads API 錯誤詳細資訊: {item_res.text}")
         return False
 
     # 2. 發佈 Media Container

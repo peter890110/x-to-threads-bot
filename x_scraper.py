@@ -35,10 +35,13 @@ def fetch_latest_tweets(username):
         # 解析 twitter-api45 的資料結構
         # 回傳通常為一個 dict 包含 'timeline' 陣列，或是直接是一個 List
         timeline_items = []
-        if isinstance(data, dict) and "timeline" in data:
+        if isinstance(data, dict) and data.get("timeline"):
             timeline_items = data["timeline"]
         elif isinstance(data, list):
             timeline_items = data
+            
+        if not timeline_items:
+            return []
             
         for item in timeline_items[:5]: # 只取最新的 5 篇
             # 過濾掉回覆，只抓原創推文
