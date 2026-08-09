@@ -13,7 +13,15 @@ def format_for_threads(tweet_text, username):
     格式化發佈到 Threads 的文字。
     Threads 上限為 500 字元。
     """
-    prefix = f"來自 X (@{username}) 的最新發文：\n\n"
+    # 建立帳號到顯示名稱的對應表
+    name_map = {
+        "aleabitoreddit": "serenity",
+        "jukan05": "Jukan"
+    }
+    
+    display_name = name_map.get(username.lower(), username)
+    prefix = f"來自X上 {display_name} 發文：\n\n"
+    
     max_text_len = 500 - len(prefix) - 3 # -3 for "..."
     
     if len(tweet_text) > max_text_len:
