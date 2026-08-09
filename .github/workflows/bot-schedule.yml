@@ -34,6 +34,7 @@ jobs:
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TARGET_TWITTER_USERNAME: ${{ secrets.TARGET_TWITTER_USERNAME }}
         run: python main.py
         
       - name: Commit and push updated seen_tweets.json
