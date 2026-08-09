@@ -26,18 +26,14 @@ def translate_to_zh(text):
         {text}
         """
         
-        # 嘗試使用不同版本的模型名稱
+        # 嘗試使用正確的模型名稱
         try:
-            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            model = genai.GenerativeModel('gemini-1.5-flash')
             response = model.generate_content(prompt)
+            translated_text = response.text.strip()
         except Exception as e:
-            if "404" in str(e) or "not found" in str(e):
-                model = genai.GenerativeModel('gemini-pro')
-                response = model.generate_content(prompt)
-            else:
-                raise e
-                
-        translated_text = response.text.strip()
+            print(f"Gemini API 呼叫失敗，請確認您的 API 金鑰是否有足夠權限: {e}")
+            return text
         
         # 雙重防線：程式碼層面強制移除不想要的符號
         for char in ['*', '「', '」', '$']:
