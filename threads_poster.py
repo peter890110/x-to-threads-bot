@@ -1,11 +1,14 @@
 import os
 import requests
 
-def post_to_threads(text):
+def post_to_threads(text, media_urls=None):
     """
-    發佈文字到 Threads。
-    Threads API 要求兩步發佈：先建立 Media Container，再 Publish。
+    發佈文字與多媒體到 Threads。
+    支援純文字、單張圖片 (IMAGE)、多張圖片 (CAROUSEL)。
     """
+    if media_urls is None:
+        media_urls = []
+        
     user_id = os.getenv("THREADS_USER_ID")
     access_token = os.getenv("THREADS_ACCESS_TOKEN")
     
@@ -15,20 +18,60 @@ def post_to_threads(text):
 
     base_url = "https://graph.threads.net/v1.0"
     
-    # 1. 建立 Media Container
-    container_url = f"{base_url}/{user_id}/threads"
-    container_payload = {
-        "media_type": "TEXT",
-        "text": text,
-        "access_token": access_token
-    }
-    
-    print("正在建立 Threads Media Container...")
     try:
-        res = requests.post(container_url, data=container_payload)
-        res.raise_for_status()
-        container_id = res.json().get("id")
-        
+        # 1. 根據是否有圖片，決定 Container 的建立方式
+        if not media_urls:
+            # 純文字
+            print("正在建立純文字 Container...")
+            container_payload = {
+                "media_type": "TEXT",
+                "text": text,
+                "access_token": access_token
+            }
+            res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload)
+            res.raise_for_status()
+            container_id = res.json().get("id")
+            
+        elif len(media_urls) == 1:
+            # 單張圖片
+            print("正在建立單圖 Container...")
+            container_payload = {
+                "media_type": "IMAGE",
+                "image_url": media_urls[0],
+                "text": text,
+                "access_token": access_token
+            }
+            res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload)
+            res.raise_for_status()
+            container_id = res.json().get("id")
+            
+        else:
+            # 多張圖片 (CAROUSEL)
+            print("正在建立多圖輪播 (Carousel) Items...")
+            # 最多支援 10 張圖片
+            carousel_items = []
+            for img_url in media_urls[:10]:
+                item_payload = {
+                    "media_type": "IMAGE",
+                    "image_url": img_url,
+                    "is_carousel_item": "true",
+                    "access_token": access_token
+                }
+                item_res = requests.post(f"{base_url}/{user_id}/threads", data=item_payload)
+                item_res.raise_for_status()
+                carousel_items.append(item_res.json().get("id"))
+                
+            print("正在建立 Carousel 主 Container...")
+            container_payload = {
+                "media_type": "CAROUSEL",
+                "children": ",".join(carousel_items),
+                "text": text,
+                "access_token": access_token
+            }
+            res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload)
+            res.raise_for_status()
+            container_id = res.json().get("id")
+            
         if not container_id:
             print("建立 Container 失敗，未取得 ID")
             return False
@@ -37,8 +80,8 @@ def post_to_threads(text):
         
     except Exception as e:
         print(f"建立 Container 發生錯誤: {e}")
-        if 'res' in locals():
-            print(res.text)
+        # 如果因為圖片連結無效導致失敗，可以考慮降級發純文字
+        # 為了簡化，這裡回傳失敗，下次排程會重試
         return False
 
     # 2. 發佈 Media Container

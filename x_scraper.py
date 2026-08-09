@@ -49,11 +49,26 @@ def fetch_latest_tweets(username):
             tweet_text = item.get("text")
             created_at = item.get("created_at")
             
+            # 解析圖片 URL
+            media_urls = []
+            extended_entities = item.get("extended_entities", {})
+            if extended_entities and "media" in extended_entities:
+                for media in extended_entities["media"]:
+                    if media.get("type") == "photo" and media.get("media_url_https"):
+                        media_urls.append(media["media_url_https"])
+            
+            # 有些 API 格式會把圖片放在 entities 裡
+            elif "entities" in item and "media" in item["entities"]:
+                for media in item["entities"]["media"]:
+                    if media.get("type") == "photo" and media.get("media_url_https"):
+                        media_urls.append(media["media_url_https"])
+            
             if tweet_id and tweet_text:
                 parsed_tweets.append({
                     "id": str(tweet_id),
                     "text": tweet_text,
-                    "created_at": created_at
+                    "created_at": created_at,
+                    "media_urls": media_urls
                 })
             
         return parsed_tweets
