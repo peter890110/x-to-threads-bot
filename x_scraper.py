@@ -5,23 +5,20 @@ import json
 def fetch_latest_tweets(username):
     """
     透過 RapidAPI 抓取指定帳號的最新推文。
-    注意：此範例程式碼以常見的 Twitter135 API 為例。
-    若您在 RapidAPI 選擇了不同的 Twitter API，URL 與回傳的 JSON 結構可能需要微調。
+    針對 twitter-api45.p.rapidapi.com 最佳化。
     """
     api_key = os.getenv("RAPIDAPI_KEY")
-    api_host = os.getenv("RAPIDAPI_HOST", "twitter135.p.rapidapi.com")
+    api_host = os.getenv("RAPIDAPI_HOST", "twitter-api45.p.rapidapi.com")
     
     if not api_key:
         print("未設定 RAPIDAPI_KEY")
         return []
 
-    # 這個 Endpoint 是以 Twitter135 為例，抓取使用者時間線
-    url = f"https://{api_host}/v2/UserTweets/"
+    # twitter-api45 的 User Timeline 端點
+    url = f"https://{api_host}/timeline.php"
     
-    # 這裡我們需要先透過 username 取得 user_id，但在某些 API 中可以直接用 username。
-    # 假設這個 API 接受 username 或是可以查詢，我們這裡簡化為直接帶參數。
-    # 實際使用時請參考您訂閱的 RapidAPI 服務文件。
-    querystring = {"username": username, "count": "5"}
+    # twitter-api45 使用 screenname 作為參數
+    querystring = {"screenname": username}
 
     headers = {
         "x-rapidapi-key": api_key,
@@ -33,22 +30,32 @@ def fetch_latest_tweets(username):
         response.raise_for_status()
         data = response.json()
         
-        # 解析推文 (不同的 RapidAPI 服務回傳結構會不同，這裡提供一個常見範例結構解析)
         parsed_tweets = []
         
-        # 假設資料結構為 data["data"]["user"]["result"]["timeline_v2"]...
-        # 為了相容性，這裡實作一個簡單的假資料模擬，或者您可以在填入真實 API 後調整此處。
-        
-        # 這裡我們用一個通用的解析方式，如果 API 失敗或不符預期，回傳空列表
-        if "data" in data:
-            # 此為簡化版解析，請依據您訂閱的 API 實際 JSON 結構修改
-            # 例如:
-            # tweets = data.get('data', {}).get('user', {}).get('result', {}).get('timeline_v2', {})...
-            pass
+        # 解析 twitter-api45 的資料結構
+        # 回傳通常為一個 dict 包含 'timeline' 陣列，或是直接是一個 List
+        timeline_items = []
+        if isinstance(data, dict) and "timeline" in data:
+            timeline_items = data["timeline"]
+        elif isinstance(data, list):
+            timeline_items = data
             
-        print("API 請求成功，由於每家 API 格式不同，請確保此處解析邏輯與您的 API 文件一致。")
-        # 為了讓您測試流程，如果無法解析，這裡會返回一個測試資料 (如果開啟測試模式)
-        
+        for item in timeline_items[:5]: # 只取最新的 5 篇
+            # 過濾掉回覆，只抓原創推文
+            if item.get("in_reply_to_status_id"):
+                continue
+                
+            tweet_id = item.get("rest_id") or item.get("id") or item.get("tweet_id")
+            tweet_text = item.get("text")
+            created_at = item.get("created_at")
+            
+            if tweet_id and tweet_text:
+                parsed_tweets.append({
+                    "id": str(tweet_id),
+                    "text": tweet_text,
+                    "created_at": created_at
+                })
+            
         return parsed_tweets
 
     except Exception as e:
