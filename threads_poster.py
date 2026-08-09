@@ -16,6 +16,18 @@ def post_to_threads(text, media_urls=None):
         print("未設定 THREADS_USER_ID 或 THREADS_ACCESS_TOKEN")
         return False
 
+    # 自動處理填錯成英文帳號的防呆機制
+    if not user_id.isdigit():
+        print(f"偵測到非數字的 User ID: {user_id}，正在自動轉換為數字 ID...")
+        me_url = "https://graph.threads.net/v1.0/me"
+        me_res = requests.get(me_url, params={"access_token": access_token})
+        if me_res.status_code == 200:
+            user_id = me_res.json().get("id")
+            print(f"成功取得數字 User ID: {user_id}")
+        else:
+            print(f"無法自動轉換 User ID，請確認您的 Access Token 是否正確。錯誤: {me_res.text}")
+            return False
+
     base_url = "https://graph.threads.net/v1.0"
     
     try:
