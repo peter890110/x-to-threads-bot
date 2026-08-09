@@ -2,6 +2,20 @@ import requests
 import os
 import json
 
+def extract_media(obj):
+    urls = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "media_url_https" or k == "media_url":
+                if isinstance(v, str) and (v.endswith('.jpg') or v.endswith('.png') or 'pbs.twimg.com/media/' in v):
+                    urls.append(v)
+            else:
+                urls.extend(extract_media(v))
+    elif isinstance(obj, list):
+        for v in obj:
+            urls.extend(extract_media(v))
+    return urls
+
 def fetch_latest_tweets(username):
     """
     透過 RapidAPI 抓取指定帳號的最新推文。
@@ -52,19 +66,8 @@ def fetch_latest_tweets(username):
             tweet_text = item.get("text")
             created_at = item.get("created_at")
             
-            # 解析圖片 URL
-            media_urls = []
-            extended_entities = item.get("extended_entities", {})
-            if extended_entities and "media" in extended_entities:
-                for media in extended_entities["media"]:
-                    if media.get("type") == "photo" and media.get("media_url_https"):
-                        media_urls.append(media["media_url_https"])
-            
-            # 有些 API 格式會把圖片放在 entities 裡
-            elif "entities" in item and "media" in item["entities"]:
-                for media in item["entities"]["media"]:
-                    if media.get("type") == "photo" and media.get("media_url_https"):
-                        media_urls.append(media["media_url_https"])
+            # 使用超強的遞迴搜尋法，把整包 JSON 裡面所有圖片網址都挖出來
+            media_urls = list(set(extract_media(item)))
             
             if tweet_id and tweet_text:
                 parsed_tweets.append({

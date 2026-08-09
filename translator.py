@@ -26,13 +26,22 @@ def translate_to_zh(text):
         {text}
         """
         
-        # 嘗試使用正確的模型名稱
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(prompt)
-            translated_text = response.text.strip()
-        except Exception as e:
-            print(f"Gemini API 呼叫失敗，請確認您的 API 金鑰是否有足夠權限: {e}")
+        # 嘗試使用一系列備用模型名稱，避免 404 錯誤
+        models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro']
+        translated_text = text
+        
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                translated_text = response.text.strip()
+                break # 成功就跳出迴圈
+            except Exception as e:
+                print(f"嘗試模型 {model_name} 失敗: {e}")
+                continue
+                
+        if translated_text == text:
+            print("警告：所有 Gemini 模型皆無法使用，退回原始語言。")
             return text
         
         # 雙重防線：程式碼層面強制移除不想要的符號

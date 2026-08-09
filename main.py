@@ -33,6 +33,8 @@ def main():
     seen_tweets = load_seen_tweets()
     is_mock = os.getenv("RAPIDAPI_KEY") == "your_rapidapi_key_here" or not os.getenv("RAPIDAPI_KEY")
     
+    has_posted = False # 確保每次排程只發一篇
+    
     for target_username in target_usernames:
         print(f"\n=========================================")
         print(f"開始檢查 @{target_username} 的最新貼文...")
@@ -77,11 +79,18 @@ def main():
             
             if success:
                 seen_tweets = mark_tweet_processed(tweet_id, seen_tweets)
+                has_posted = True
+                print("✅ 已成功發佈一篇貼文，本次任務結束。")
+                break # 成功發布一篇後就跳出迴圈
             else:
                 print(f"發佈失敗 (ID: {tweet_id})，保留狀態下次重試。")
                 
         if not new_tweets_found:
             print(f"目前沒有 @{target_username} 的新貼文需要搬運。")
+            
+        # 如果已經發布過一篇，就不再檢查其他網紅
+        if has_posted:
+            break
 
 if __name__ == "__main__":
     main()
