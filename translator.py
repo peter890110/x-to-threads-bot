@@ -13,8 +13,6 @@ def translate_to_zh(text):
         
     try:
         genai.configure(api_key=api_key)
-        # 使用 Gemini 1.5 Flash，速度快且便宜
-        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
         你是一個專業的社群媒體編輯。請將以下這段來自國外財經網紅的推文，翻譯成流暢、自然的台灣繁體中文。
@@ -28,7 +26,17 @@ def translate_to_zh(text):
         {text}
         """
         
-        response = model.generate_content(prompt)
+        # 嘗試使用不同版本的模型名稱
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            response = model.generate_content(prompt)
+        except Exception as e:
+            if "404" in str(e) or "not found" in str(e):
+                model = genai.GenerativeModel('gemini-pro')
+                response = model.generate_content(prompt)
+            else:
+                raise e
+                
         translated_text = response.text.strip()
         
         # 雙重防線：程式碼層面強制移除不想要的符號
