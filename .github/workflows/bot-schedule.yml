@@ -26,12 +26,12 @@ jobs:
         pip install -r requirements.txt
 
     - name: Run Bot
-      env:
-        RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-        RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
-        THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
-        THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
-        TARGET_TWITTER_USERNAME: ${{ secrets.TARGET_TWITTER_USERNAME }}
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: python main.py
 
     - name: Commit and push updated seen_tweets.json
