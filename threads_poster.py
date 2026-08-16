@@ -1,7 +1,7 @@
 import os
 import requests
 
-def post_to_threads(text, media_urls=None):
+def post_to_threads(text, media_urls=None, reply_to_id=None):
     """
     發佈文字與多媒體到 Threads。
     支援純文字、單張圖片 (IMAGE)、多張圖片 (CAROUSEL)。
@@ -40,6 +40,9 @@ def post_to_threads(text, media_urls=None):
                 "text": text,
                 "access_token": access_token
             }
+            if reply_to_id:
+                container_payload["reply_to_id"] = reply_to_id
+                
             res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload)
             res.raise_for_status()
             container_id = res.json().get("id")
@@ -53,6 +56,9 @@ def post_to_threads(text, media_urls=None):
                 "text": text,
                 "access_token": access_token
             }
+            if reply_to_id:
+                container_payload["reply_to_id"] = reply_to_id
+                
             res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload)
             res.raise_for_status()
             container_id = res.json().get("id")
@@ -80,6 +86,9 @@ def post_to_threads(text, media_urls=None):
                 "text": text,
                 "access_token": access_token
             }
+            if reply_to_id:
+                container_payload["reply_to_id"] = reply_to_id
+                
             res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload)
             res.raise_for_status()
             container_id = res.json().get("id")
@@ -111,7 +120,7 @@ def post_to_threads(text, media_urls=None):
         pub_res.raise_for_status()
         post_id = pub_res.json().get("id")
         print(f"✅ 發佈成功！Threads Post ID: {post_id}")
-        return True
+        return post_id
     except Exception as e:
         print(f"發佈至 Threads 發生錯誤: {e}")
         if 'pub_res' in locals():

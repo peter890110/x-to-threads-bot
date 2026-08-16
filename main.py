@@ -83,26 +83,60 @@ def is_finance_related(text):
     # 如果又短又沒有關鍵字，大概率是生活廢文 (例如 "Good morning!", "I had a great coffee")
     return False
 
-def format_for_threads(tweet_text, username):
+def chunk_text(tweet_text, username, max_len=500):
     """
-    格式化發佈到 Threads 的文字。
-    Threads 上限為 500 字元。
+    將長文章分段。Threads 每篇上限為 500 字元。
+    第一段加上網紅前綴，並以換行符號為優先切分點。
     """
-    # 建立帳號到顯示名稱的對應表
     name_map = {
         "aleabitoreddit": "serenity",
         "jukan05": "Jukan"
     }
-    
     display_name = name_map.get(username.lower(), username)
     prefix = f"來自X上 {display_name} 發文：\n\n"
     
-    max_text_len = 500 - len(prefix) - 3 # -3 for "..."
+    chunks = []
     
-    if len(tweet_text) > max_text_len:
-        tweet_text = tweet_text[:max_text_len] + "..."
+    if len(prefix) + len(tweet_text) <= max_len:
+        return [prefix + tweet_text]
         
-    return prefix + tweet_text
+    paragraphs = tweet_text.split('\n')
+    current_chunk = prefix
+    
+    for p in paragraphs:
+        separator = '\n' if current_chunk != prefix and current_chunk != "" else ""
+        
+        # 處理單一段落超過 max_len 的極端情況
+        if len(p) > max_len:
+            if current_chunk != prefix and current_chunk != "":
+                chunks.append(current_chunk)
+            
+            # 將這個過長段落暴力切分
+            remaining_p = p
+            while len(remaining_p) > 0:
+                is_first = (len(chunks) == 0)
+                limit = max_len - len(prefix) if is_first else max_len
+                
+                chunk_part = remaining_p[:limit]
+                if is_first:
+                    chunks.append(prefix + chunk_part)
+                else:
+                    chunks.append(chunk_part)
+                remaining_p = remaining_p[limit:]
+                
+            current_chunk = "" # 清空，因為上面已經 append 完了
+            continue
+            
+        if len(current_chunk) + len(separator) + len(p) <= max_len:
+            current_chunk += separator + p
+        else:
+            chunks.append(current_chunk)
+            current_chunk = p
+            
+    if current_chunk and current_chunk != prefix:
+        chunks.append(current_chunk)
+        
+    return chunks
 
 def main():
     target_usernames_str = os.getenv("TARGET_TWITTER_USERNAME")
@@ -168,15 +202,31 @@ def main():
             # 翻譯並清理特定符號
             translated_text = translate_to_zh(tweet_text)
             
-            threads_content = format_for_threads(translated_text, target_username)
+            # 將長文章分段
+            chunks = chunk_text(translated_text, target_username)
+            if not chunks:
+                continue
+                
+            # 發佈第一段 (包含多媒體)
+            import time
+            first_post_id = post_to_threads(chunks[0], media_urls)
             
-            # 呼叫 Threads API (帶入圖片)
-            success = post_to_threads(threads_content, media_urls)
-            
-            if success:
+            if first_post_id:
+                parent_id = first_post_id
+                # 發佈後續留言串
+                for i, chunk in enumerate(chunks[1:]):
+                    print(f"正在發佈第 {i+2} 段留言 (接續貼文 ID: {parent_id})...")
+                    time.sleep(3) # 稍微等待避免觸發 API 頻率限制
+                    reply_id = post_to_threads(chunk, media_urls=[], reply_to_id=parent_id)
+                    if reply_id:
+                        parent_id = reply_id # 將下一則接在剛發佈的留言下，形成串流
+                    else:
+                        print("後續留言發佈失敗！")
+                        break
+                
                 seen_tweets = mark_tweet_processed(tweet_id, seen_tweets)
                 has_posted = True
-                print("✅ 已成功發佈一篇貼文，本次任務結束。")
+                print("✅ 已成功發佈一篇完整串文，本次任務結束。")
                 break # 成功發布一篇後就跳出迴圈
             else:
                 print(f"發佈失敗 (ID: {tweet_id})，保留狀態下次重試。")
