@@ -9,6 +9,8 @@ from translator import translate_to_zh
 # 載入 .env 檔案中的環境變數
 load_dotenv()
 
+import email.utils
+
 def is_within_last_6_hours(created_at_str):
     """
     判斷推文是否在過去 6 小時內發布。
@@ -17,20 +19,39 @@ def is_within_last_6_hours(created_at_str):
     if not created_at_str:
         return True
         
+    dt = None
     try:
-        # 嘗試解析標準 Twitter 格式 (例如: Sat Aug 09 10:00:00 +0000 2026)
+        # 1. 嘗試解析標準 Twitter 格式 (例如: Sat Aug 09 10:00:00 +0000 2026)
         dt = datetime.strptime(created_at_str, '%a %b %d %H:%M:%S %z %Y')
     except ValueError:
         try:
-            # 嘗試解析 ISO 格式 (例如: 2026-08-09T10:00:00.000Z)
+            # 2. 嘗試解析標準 Internet 格式 (RFC 2822, 例如: Sun, 16 Aug 2026...)
+            parsed = email.utils.parsedate_to_datetime(created_at_str)
+            if parsed:
+                dt = parsed
+        except (ValueError, TypeError):
+            pass
+            
+    if not dt:
+        try:
+            # 3. 嘗試解析 ISO 格式 (例如: 2026-08-09T10:00:00.000Z)
             clean_str = created_at_str.replace('Z', '+00:00')
             dt = datetime.fromisoformat(clean_str)
         except ValueError:
-            return True
+            pass
+
+    if not dt:
+        print(f"⚠️ 無法解析時間格式: {created_at_str}，預設放行。")
+        return True
             
     now = datetime.now(timezone.utc)
     diff = now - dt
-    return diff <= timedelta(hours=6)
+    
+    is_valid = diff <= timedelta(hours=6)
+    if not is_valid:
+        print(f"貼文時間: {dt} (距離現在已經 {diff})，太舊了。")
+        
+    return is_valid
 
 def is_finance_related(text):
     """
