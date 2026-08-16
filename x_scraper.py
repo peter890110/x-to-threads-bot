@@ -89,26 +89,102 @@ def fetch_latest_tweets(username):
         if not timeline_items:
             return []
             
-        for item in timeline_items[:5]: # 只取最新的 5 篇
-            # 過濾掉回覆，只抓原創推文
-            if item.get("in_reply_to_status_id"):
+        # 第一步：過濾與整理所有貼文
+        tweet_dict = {}
+        for item in timeline_items:
+            tid = str(item.get("rest_id") or item.get("id") or item.get("tweet_id"))
+            if not tid: continue
+            
+            # 檢查是否為回覆
+            reply_to_user = item.get("in_reply_to_screen_name")
+            is_reply = item.get("in_reply_to_status_id") is not None
+            
+            # 如果是回覆，而且回覆的對象不是自己 (username)，代表這是他在別人版面上的留言，忽略
+            if is_reply and reply_to_user and reply_to_user.lower() != username.lower():
                 continue
                 
-            tweet_id = item.get("rest_id") or item.get("id") or item.get("tweet_id")
-            # 改用全新的長推文挖掘函數
-            tweet_text = extract_best_text(item)
-            created_at = item.get("created_at")
+            reply_to_id = str(item.get("in_reply_to_status_id")) if is_reply else None
             
-            # 使用超強的遞迴搜尋法，把整包 JSON 裡面所有圖片網址都挖出來
-            media_urls = list(set(extract_media(item)))
+            tweet_dict[tid] = {
+                "id": tid,
+                "text": extract_best_text(item),
+                "created_at": item.get("created_at"),
+                "media_urls": list(set(extract_media(item))),
+                "reply_to_id": reply_to_id
+            }
+
+        parsed_tweets = []
+        
+        # 第二步：自動縫合 Thread (串文)
+        # 依照 timeline 順序掃描，找出「串文的源頭」
+        for item in timeline_items:
+            tid = str(item.get("rest_id") or item.get("id") or item.get("tweet_id"))
+            if tid not in tweet_dict:
+                continue
+                
+            t = tweet_dict[tid]
             
-            if tweet_id and tweet_text:
+            # 什麼是源頭？這篇不是回覆，或者它回覆的那篇已經古老到不在這次抓取的列表裡了
+            if not t["reply_to_id"] or t["reply_to_id"] not in tweet_dict:
+                combined_text = t["text"]
+                combined_media = list(t["media_urls"])
+                
+                # 往下尋找有沒有回覆它的子推文，把整串故事接起來
+                current_id = tid
+                while True:
+                    child = None
+                    for child_id, child_t in tweet_dict.items():
+                        if child_t["reply_to_id"] == current_id:
+                            child = child_t
+                            break
+                            
+                    if child:
+                        combined_text += "\n\n" + child["text"]
+                        combined_media.extend(child["media_urls"])
+                        current_id = child["id"]
+                    else:
+                        break
+                        
+                # 圖片去重
+                final_media = []
+                for m in combined_media:
+                    if m not in final_media:
+                        final_media.append(m)
+                        
                 parsed_tweets.append({
-                    "id": str(tweet_id),
-                    "text": tweet_text,
-                    "created_at": created_at,
-                    "media_urls": media_urls
+                    "id": tid, # 用源頭的 ID 代表整串
+                    "text": combined_text,
+                    "created_at": t["created_at"],
+                    "media_urls": final_media
                 })
+                
+                if len(parsed_tweets) >= 5:
+                    break
+                    
+        # 第三步：為了防範 timeline 端點惡意閹割 Twitter Blue 長推文，
+        # 我們針對選出來的推文，額外呼叫一次 tweet.php (單篇詳情端點) 來獲取 100% 完整的內文
+        for pt in parsed_tweets:
+            details_url = f"https://{api_host}/tweet.php"
+            try:
+                # 嘗試呼叫詳情端點
+                res = requests.get(details_url, headers=headers, params={"id": pt["id"]})
+                if res.status_code == 200:
+                    detail_data = res.json()
+                    detail_text = extract_best_text(detail_data)
+                    
+                    # 如果詳情端點給出的文字比 timeline 給的還要長，代表 timeline 真的隱藏了內容！
+                    if len(detail_text) > len(pt["text"]):
+                        print(f"成功透過 tweet.php 挖出被隱藏的超長文！字數從 {len(pt['text'])} 暴增至 {len(detail_text)} 字。")
+                        pt["text"] = detail_text
+                        
+                    # 順便把詳情裡可能隱藏的圖片也補上
+                    detail_media = extract_media(detail_data)
+                    for dm in detail_media:
+                        if dm not in pt["media_urls"]:
+                            pt["media_urls"].append(dm)
+            except Exception as e:
+                print(f"嘗試抓取單篇詳情 (ID: {pt['id']}) 失敗，使用原有內容: {e}")
+                pass
             
         return parsed_tweets
 
