@@ -60,15 +60,19 @@ def is_finance_related(text):
     """
     text_lower = text.lower()
     
-    # 財經、科技與國際新聞的關鍵字庫 (涵蓋中英文)
+    # 財經、產業、科技與時事新聞的擴充關鍵字庫 (涵蓋中英文)
     keywords = [
         'stock', 'market', 'economy', 'inflation', 'fed', 'rate', 'earning', 
         'crypto', 'bitcoin', 'btc', 'eth', 'gdp', 'sec', 'bank', 'crisis', 
         'news', 'global', 'invest', 'trading', 'yield', 'bond', 'nasdaq', 
         'sp500', 'dow', 'wall street', 'bull', 'bear', 'portfolio', 'asset',
         'ai', 'nvidia', 'nvda', 'tsmc', 'apple', 'meta', 'google', 'microsoft',
+        'report', 'upgrade', 'downgrade', 'target', 'guidance', 'semi', 'tech',
+        'revenue', 'profit', 'margin', 'industry', 'policy', 'election',
         '股市', '經濟', '通膨', '降息', '升息', '聯準會', '財報', '加密貨幣', 
-        '比特幣', '投資', '交易', '華爾街', '牛市', '熊市', '市場', '新聞'
+        '比特幣', '投資', '交易', '華爾街', '牛市', '熊市', '市場', '新聞',
+        '產業', '券商', '報告', '目標價', '營收', '利潤', '毛利', '半導體', 
+        '科技', '時事', '外資', '評級', '供應鏈', '政策', '大選'
     ]
     
     # 如果包含關鍵字，直接放行
@@ -76,11 +80,11 @@ def is_finance_related(text):
         if kw in text_lower:
             return True
             
-    # 如果沒有關鍵字，但文章長度很長 (超過 150 字)，通常是認真的長篇分析，也放行
-    if len(text) > 150:
+    # 如果沒有關鍵字，但文章長度非常長 (超過 250 字)，通常是深度的認真分析，也放行
+    if len(text) > 250:
         return True
         
-    # 如果又短又沒有關鍵字，大概率是生活廢文 (例如 "Good morning!", "I had a great coffee")
+    # 如果又短又沒有關鍵字，很高機率是 casual 生活廢文 (例如 "Good morning", "Had a nice lunch")
     return False
 
 def chunk_text(tweet_text, username, max_len=500):
