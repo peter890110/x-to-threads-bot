@@ -199,8 +199,16 @@ def main():
             new_tweets_found = True
             print(f"發現新貼文 (ID: {tweet_id})，準備翻譯並搬運至 Threads...")
             
+            # 清除原推文中的 t.co 短網址 (多媒體或外部連結)
+            import re
+            clean_tweet_text = re.sub(r'https?://t\.co/\w+', '', tweet_text).strip()
+            
             # 翻譯並清理特定符號
-            translated_text = translate_to_zh(tweet_text)
+            translated_text = translate_to_zh(clean_tweet_text)
+            
+            if not translated_text:
+                print(f"翻譯完全失敗 (ID: {tweet_id})，保留狀態下次重試。")
+                continue
             
             # 將長文章分段
             chunks = chunk_text(translated_text, target_username)

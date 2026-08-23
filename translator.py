@@ -55,9 +55,16 @@ def translate_to_zh(text):
         print("⚠️ Gemini 翻譯失敗，啟動 Google Translate 終極備用方案...")
         try:
             translated_text = GoogleTranslator(source='auto', target='zh-TW').translate(text)
+            # 檢查 deep-translator 是否抓到了 Google 的 500 錯誤網頁
+            if translated_text and ("Error 500 (Server Error)" in translated_text or "That’s an error" in translated_text or "That's an error" in translated_text):
+                print("Google Translate 回傳 500 伺服器錯誤，備用翻譯失敗。")
+                return None
         except Exception as e:
             print(f"終極備用方案也失敗: {e}")
-            return text
+            return None
+            
+    if not translated_text:
+        return None
             
     # 雙重防線：程式碼層面強制移除不想要的符號
     for char in ['*', '「', '」', '$']:
