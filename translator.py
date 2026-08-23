@@ -29,7 +29,14 @@ def translate_to_zh(text):
         {text}
         """
         
-        models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro']
+        models_to_try = [
+            'gemini-1.5-flash', 
+            'gemini-1.5-flash-latest', 
+            'gemini-1.5-pro', 
+            'gemini-1.0-pro', 
+            'gemini-pro',
+            'gemini-2.0-flash'
+        ]
         
         for model_name in models_to_try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
