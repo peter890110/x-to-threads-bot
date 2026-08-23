@@ -30,12 +30,10 @@ def translate_to_zh(text):
         """
         
         models_to_try = [
-            'gemini-1.5-flash', 
-            'gemini-1.5-flash-latest', 
-            'gemini-1.5-pro', 
-            'gemini-1.0-pro', 
-            'gemini-pro',
-            'gemini-2.0-flash'
+            'gemini-3.6-flash',
+            'gemini-3.6-pro',
+            'gemini-4.0-flash', # 防患未然
+            'gemini-1.5-flash'  # 保留舊的當作備用
         ]
         
         for model_name in models_to_try:
