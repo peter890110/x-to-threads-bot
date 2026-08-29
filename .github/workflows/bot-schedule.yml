@@ -2,44 +2,49 @@ name: X to Threads Bot Scheduled Run
 
 on:
   schedule:
-    # 每 6 小時執行一次
-    - cron: '0 */6 * * *'
+    # UTC 22:00 為台灣時間早上 6:00
+    # UTC 09:00 為台灣時間下午 17:00 (5 PM)
+    - cron: '0 22,9 * * *'
   # 允許我們手動點擊按鈕觸發
   workflow_dispatch:
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          
-      - name: Run Bot
-        env:
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-          RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
-          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
-          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          TARGET_TWITTER_USERNAME: ${{ secrets.TARGET_TWITTER_USERNAME }}
-        run: python main.py
-        
-      - name: Commit and push updated seen_tweets.json
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add seen_tweets.json || true
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update seen_tweets.json" && git push)
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # 需要取得完整的 commit 歷史，確保我們可以把更新後的 state 檔推回 repo
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Bot
+      env:
+        RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+        RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
+        THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+        THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+        TARGET_TWITTER_USERNAME: ${{ secrets.TARGET_TWITTER_USERNAME }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      run: python main.py
+
+    - name: Commit and push updated seen_tweets.json
+      # 這一步確保我們發佈成功後，機器人會把 seen_tweets.json 存回 GitHub
+      # 這樣下次執行才不會重複發佈
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        git add seen_tweets.json
+        # 如果檔案有變更才 commit
+        git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update seen_tweets.json" && git push)
