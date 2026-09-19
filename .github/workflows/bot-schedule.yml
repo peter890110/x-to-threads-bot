@@ -3,23 +3,18 @@ on:
   schedule:
     - cron: '0 22,9 * * *'
   workflow_dispatch:
-  push:
-    branches: [main]
 permissions:
   contents: write
-env:
-  FORCE_REPOST: "true"
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      with: {fetch-depth: 0}
     - uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      with: {python-version: '3.11'}
     - run: pip install -r requirements.txt
+    - run: python -m playwright install --with-deps chromium
     - name: Run Bot
       env:
         RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
