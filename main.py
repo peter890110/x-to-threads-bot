@@ -5,7 +5,8 @@ from x_scraper import fetch_latest_tweets, get_mock_tweets
 from threads_poster import post_to_threads
 from state_manager import load_seen_tweets, is_tweet_processed, mark_tweet_processed
 from translator import translate_to_zh
-from tweet_card import create_tweet_card, publish_card_to_github
+from tweet_card import publish_card_to_github
+from x_screenshot import capture_x_post
 
 # 載入 .env 檔案中的環境變數
 load_dotenv()
@@ -224,15 +225,18 @@ def main():
             if not chunks:
                 continue
 
-            # 原貼文若沒有圖片，產生原文貼文卡並公開於此 repo，讓 Threads 可抓取圖片網址。
+            # 原貼文若沒有圖片，直接截取 X 官方嵌入貼文畫面。
             if not media_urls:
-                card_path = create_tweet_card(tweet_id, target_username, clean_tweet_text)
+                card_path = capture_x_post(tweet_id)
+                if not card_path:
+                    print("無法截取原始 X 貼文，保留狀態下次重試。")
+                    continue
                 card_url = publish_card_to_github(tweet_id, card_path)
                 if not card_url:
                     print("無法建立原文貼文卡，保留狀態下次重試。")
                     continue
                 media_urls = [card_url]
-                print("原貼文無圖片，已建立原文貼文卡。")
+                print("原貼文無圖片，已截取原始 X 貼文。")
                 
             # 發佈第一段 (包含多媒體)
             import time
