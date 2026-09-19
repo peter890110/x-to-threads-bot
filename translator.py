@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from deep_translator import GoogleTranslator
 
@@ -19,6 +20,11 @@ def translate_to_zh(text):
         1. 語氣要生動自然，符合台灣社群平台的閱讀習慣，不要有生硬的機器翻譯感。
         2. 請適當加入分段與空行，讓排版清晰易讀，絕對不要讓整坨文字擠在一起。
         3. 這是財經/股市相關推文，請精準使用台灣的金融術語 (例如 Bear = 看空/熊市，Bull = 看多/牛市，Short = 做空，Long = 做多，Names = 個股/標的，Playbook = 劇本/策略)。
+
+        【公司與專有名詞：零容忍猜測】
+        1. 公司名、品牌名、人物名、產品名、股票代號、縮寫一律以原文保留，除非你能百分之百確定正式的台灣慣用譯名。
+        2. 絕不能把縮寫或相似拼字自行推測成另一家公司。例如 Ant 不可翻成螞蟻集團；提及 Anthropic 時，請保留 Anthropic。
+        3. 不確定的台灣公司名稱請保留英文原文，不可自行創造中文譯名。已經是中文的公司名稱必須原樣保留，例如新日興不可改寫成其他名稱。
         
         【嚴格規定】
         1. 絕對不要在翻譯結果中使用這些符號：*, 「, 」, $
@@ -74,5 +80,15 @@ def translate_to_zh(text):
     # 雙重防線：程式碼層面強制移除不想要的符號
     for char in ['*', '「', '」', '$']:
         translated_text = translated_text.replace(char, '')
-        
+
+    # 修正常見且風險極高的錯誤歸類；寧可保留原文也不能指向錯公司。
+    protected_terms = {
+        '螞蟻集團': 'Ant',
+        '蚂蚁集团': 'Ant',
+        '新祖盛': '新日興',
+    }
+    for wrong, correct in protected_terms.items():
+        if wrong in translated_text and ("Ant" in text or "Anthropic" in text or "新日興" in text):
+            translated_text = translated_text.replace(wrong, correct)
+    
     return translated_text
