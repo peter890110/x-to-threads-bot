@@ -1,5 +1,9 @@
 import os
+import time
 import requests
+
+API_TIMEOUT_SECONDS = 30
+PUBLISH_ATTEMPTS = 8
 
 def post_to_threads(text, media_urls=None, reply_to_id=None):
     """
@@ -20,7 +24,7 @@ def post_to_threads(text, media_urls=None, reply_to_id=None):
     if not user_id.isdigit():
         print(f"偵測到非數字的 User ID: {user_id}，正在自動轉換為數字 ID...")
         me_url = "https://graph.threads.net/v1.0/me"
-        me_res = requests.get(me_url, params={"access_token": access_token})
+        me_res = requests.get(me_url, params={"access_token": access_token}, timeout=API_TIMEOUT_SECONDS)
         if me_res.status_code == 200:
             user_id = me_res.json().get("id")
             print(f"成功取得數字 User ID: {user_id}")
@@ -43,7 +47,7 @@ def post_to_threads(text, media_urls=None, reply_to_id=None):
             if reply_to_id:
                 container_payload["reply_to_id"] = reply_to_id
                 
-            res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload)
+            res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload, timeout=API_TIMEOUT_SECONDS)
             res.raise_for_status()
             container_id = res.json().get("id")
             
@@ -59,7 +63,7 @@ def post_to_threads(text, media_urls=None, reply_to_id=None):
             if reply_to_id:
                 container_payload["reply_to_id"] = reply_to_id
                 
-            res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload)
+            res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload, timeout=API_TIMEOUT_SECONDS)
             res.raise_for_status()
             container_id = res.json().get("id")
             
@@ -75,7 +79,7 @@ def post_to_threads(text, media_urls=None, reply_to_id=None):
                     "is_carousel_item": "true",
                     "access_token": access_token
                 }
-                item_res = requests.post(f"{base_url}/{user_id}/threads", data=item_payload)
+                item_res = requests.post(f"{base_url}/{user_id}/threads", data=item_payload, timeout=API_TIMEOUT_SECONDS)
                 item_res.raise_for_status()
                 carousel_items.append(item_res.json().get("id"))
                 
@@ -89,7 +93,7 @@ def post_to_threads(text, media_urls=None, reply_to_id=None):
             if reply_to_id:
                 container_payload["reply_to_id"] = reply_to_id
                 
-            res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload)
+            res = requests.post(f"{base_url}/{user_id}/threads", data=container_payload, timeout=API_TIMEOUT_SECONDS)
             res.raise_for_status()
             container_id = res.json().get("id")
             
@@ -114,15 +118,20 @@ def post_to_threads(text, media_urls=None, reply_to_id=None):
         "access_token": access_token
     }
     
-    print("正在發佈至 Threads...")
-    try:
-        pub_res = requests.post(publish_url, data=publish_payload)
-        pub_res.raise_for_status()
-        post_id = pub_res.json().get("id")
-        print(f"✅ 發佈成功！Threads Post ID: {post_id}")
-        return post_id
-    except Exception as e:
-        print(f"發佈至 Threads 發生錯誤: {e}")
-        if 'pub_res' in locals():
-            print(pub_res.text)
-        return False
+    # 圖片與輪播的 container 可能需要數秒處理才可發布；短暫重試避免漏發。
+    for attempt in range(1, PUBLISH_ATTEMPTS + 1):
+        print(f"正在發佈至 Threads（第 {attempt} 次）...")
+        try:
+            pub_res = requests.post(publish_url, data=publish_payload, timeout=API_TIMEOUT_SECONDS)
+            pub_res.raise_for_status()
+            post_id = pub_res.json().get("id")
+            if post_id:
+                print(f"✅ 發佈成功！Threads Post ID: {post_id}")
+                return post_id
+            print(f"Threads 未回傳貼文 ID：{pub_res.text}")
+        except requests.RequestException as e:
+            detail = pub_res.text if 'pub_res' in locals() else ''
+            print(f"發佈尚未就緒：{e} {detail}")
+        if attempt < PUBLISH_ATTEMPTS:
+            time.sleep(5)
+    return False

@@ -73,7 +73,7 @@ def fetch_latest_tweets(username):
     }
 
     try:
-        response = requests.get(url, headers=headers, params=querystring)
+        response = requests.get(url, headers=headers, params=querystring, timeout=30)
         response.raise_for_status()
         data = response.json()
         
@@ -167,7 +167,7 @@ def fetch_latest_tweets(username):
             details_url = f"https://{api_host}/tweet.php"
             try:
                 # 嘗試呼叫詳情端點
-                res = requests.get(details_url, headers=headers, params={"id": pt["id"]})
+                res = requests.get(details_url, headers=headers, params={"id": pt["id"]}, timeout=30)
                 if res.status_code == 200:
                     detail_data = res.json()
                     detail_text = extract_best_text(detail_data)

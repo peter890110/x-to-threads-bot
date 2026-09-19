@@ -47,7 +47,8 @@ def is_within_last_6_hours(created_at_str):
     now = datetime.now(timezone.utc)
     diff = now - dt
     
-    is_valid = diff <= timedelta(hours=6)
+    # 未來時間通常代表 API 時區或格式解析異常，避免被當成新貼文搬運。
+    is_valid = timedelta(0) <= diff <= timedelta(hours=6)
     if not is_valid:
         print(f"貼文時間: {dt} (距離現在已經 {diff})，太舊了。")
         
@@ -225,6 +226,7 @@ def main():
             
             if first_post_id:
                 parent_id = first_post_id
+                thread_complete = True
                 # 發佈後續留言串
                 for i, chunk in enumerate(chunks[1:]):
                     print(f"正在發佈第 {i+2} 段留言 (接續貼文 ID: {parent_id})...")
@@ -234,12 +236,16 @@ def main():
                         parent_id = reply_id # 將下一則接在剛發佈的留言下，形成串流
                     else:
                         print("後續留言發佈失敗！")
+                        thread_complete = False
                         break
-                
-                seen_tweets = mark_tweet_processed(tweet_id, seen_tweets)
-                has_posted = True
-                print("✅ 已成功發佈一篇完整串文，本次任務結束。")
-                break # 成功發布一篇後就跳出迴圈
+
+                # 只有完整串文都成功時才記錄，避免半串失敗後永久漏發。
+                if thread_complete:
+                    seen_tweets = mark_tweet_processed(tweet_id, seen_tweets)
+                    has_posted = True
+                    print("✅ 已成功發佈一篇完整串文，本次任務結束。")
+                    break # 成功發布一篇後就跳出迴圈
+                print("此串文未完整發佈，保留狀態供下次重試。")
             else:
                 print(f"發佈失敗 (ID: {tweet_id})，保留狀態下次重試。")
                 
