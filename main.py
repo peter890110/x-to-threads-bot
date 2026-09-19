@@ -154,6 +154,9 @@ def main():
     target_usernames = [u.strip() for u in target_usernames_str.split(",") if u.strip()]
     
     seen_tweets = load_seen_tweets()
+    force_repost = os.getenv("FORCE_REPOST", "").lower() == "true"
+    if force_repost:
+        print("⚠️ 強制重發模式啟用：本次略過重複、時間與題材篩選。")
     is_mock = os.getenv("RAPIDAPI_KEY") == "your_rapidapi_key_here" or not os.getenv("RAPIDAPI_KEY")
     
     has_posted = False # 確保每次排程只發一篇
@@ -187,16 +190,16 @@ def main():
             if not tweet_id or not tweet_text:
                 continue
                 
-            if is_tweet_processed(tweet_id, seen_tweets):
+            if is_tweet_processed(tweet_id, seen_tweets) and not force_repost:
                 continue
                 
-            if not is_within_last_6_hours(created_at):
+            if not is_within_last_6_hours(created_at) and not force_repost:
                 print(f"貼文 (ID: {tweet_id}) 太舊 (超過 6 小時)，跳過不搬運。")
                 # 雖然不搬運，但還是標記為已處理，避免下次又重複檢查
                 seen_tweets = mark_tweet_processed(tweet_id, seen_tweets)
                 continue
                 
-            if not is_finance_related(tweet_text):
+            if not is_finance_related(tweet_text) and not force_repost:
                 print(f"貼文 (ID: {tweet_id}) 判定為非財經/國際新聞的廢文，跳過不搬運。")
                 # 標記為已處理，避免下次又重複檢查
                 seen_tweets = mark_tweet_processed(tweet_id, seen_tweets)
