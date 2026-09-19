@@ -20,6 +20,8 @@ jobs:
 env:
   FORCE_REPOST: "true"
 
+  push:
+    branches: [main]
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
