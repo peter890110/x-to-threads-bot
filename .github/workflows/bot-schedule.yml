@@ -8,6 +8,9 @@ on:
   # 允許我們手動點擊按鈕觸發
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
@@ -37,7 +40,29 @@ jobs:
         THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
         TARGET_TWITTER_USERNAME: ${{ secrets.TARGET_TWITTER_USERNAME }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      run: python main.py
+      run: |
+        set -o pipefail
+        python main.py | tee bot.log
+
+    - name: Publish bot diagnostics
+      if: always()
+      run: |
+        {
+          echo "## X to Threads Bot 執行結果"
+          echo
+          echo '~~~text'
+          tail -n 200 bot.log 2>/dev/null || echo "機器人尚未產生日誌。"
+          echo '~~~'
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload bot log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: bot-log
+        path: bot.log
+        if-no-files-found: warn
+        retention-days: 14
 
     - name: Commit and push updated seen_tweets.json
       # 這一步確保我們發佈成功後，機器人會把 seen_tweets.json 存回 GitHub
