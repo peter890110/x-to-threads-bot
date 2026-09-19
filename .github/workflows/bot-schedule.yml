@@ -1,44 +1,25 @@
 name: X to Threads Bot Scheduled Run
-
 on:
   schedule:
-    # UTC 22:00 為台灣時間早上 6:00
-    # UTC 09:00 為台灣時間下午 17:00 (5 PM)
     - cron: '0 22,9 * * *'
-  # 允許我們手動點擊按鈕觸發
   workflow_dispatch:
-
+  push:
+    branches: [main]
 permissions:
   contents: write
-
+env:
+  FORCE_REPOST: "true"
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-
-
-# Temporary one-time repost test
-env:
-  FORCE_REPOST: "true"
-
-  push:
-    branches: [main]
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
       with:
-        # 需要取得完整的 commit 歷史，確保我們可以把更新後的 state 檔推回 repo
         fetch-depth: 0
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
+    - run: pip install -r requirements.txt
     - name: Run Bot
       env:
         RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
@@ -47,36 +28,4 @@ env:
         THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
         TARGET_TWITTER_USERNAME: ${{ secrets.TARGET_TWITTER_USERNAME }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      run: |
-        set -o pipefail
-        python main.py | tee bot.log
-
-    - name: Publish bot diagnostics
-      if: always()
-      run: |
-        {
-          echo "## X to Threads Bot 執行結果"
-          echo
-          echo '~~~text'
-          tail -n 200 bot.log 2>/dev/null || echo "機器人尚未產生日誌。"
-          echo '~~~'
-        } >> "$GITHUB_STEP_SUMMARY"
-
-    - name: Upload bot log
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: bot-log
-        path: bot.log
-        if-no-files-found: warn
-        retention-days: 14
-
-    - name: Commit and push updated seen_tweets.json
-      # 這一步確保我們發佈成功後，機器人會把 seen_tweets.json 存回 GitHub
-      # 這樣下次執行才不會重複發佈
-      run: |
-        git config --global user.name 'github-actions[bot]'
-        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-        git add seen_tweets.json
-        # 如果檔案有變更才 commit
-        git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update seen_tweets.json" && git push)
+      run: python main.py
