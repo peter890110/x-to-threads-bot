@@ -43,6 +43,8 @@ def create_tweet_card(tweet_id, username, text):
 def publish_card_to_github(tweet_id, path):
     """Make the generated image public through this repository's raw URL."""
     try:
+        subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
+        subprocess.run(["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"], check=True)
         subprocess.run(["git", "add", str(path)], check=True)
         changed = subprocess.run(["git", "diff", "--cached", "--quiet"]).returncode != 0
         if changed:
