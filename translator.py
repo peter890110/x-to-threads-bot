@@ -1,94 +1,63 @@
+"""Translate source X posts with the OpenAI Responses API."""
+
 import os
-import re
-import requests
-from deep_translator import GoogleTranslator
 
-def translate_to_zh(text):
+from openai import OpenAI
+
+
+TRANSLATION_INSTRUCTIONS = """
+你是台灣財經社群的專業譯者。將使用者提供的 X 貼文翻成自然、精確的繁體中文（台灣用語）。
+
+最重要規則：原文是唯一事實來源。不得根據圖片、常識、相似拼字或外部知識猜測、補充或改寫公司、人物、品牌、產品、股票代號、數字、職稱、地點或事件。
+
+專有名詞規則：
+- 人名、公司、品牌、產品、股票代號、縮寫，除非原文已經給出明確且通行的繁中名稱，否則保留原文。
+- 不能因為縮寫相似就改成別的實體。例如原文的 Ant 必須保留 Ant；只有原文明寫 Ant Group 時，才能翻成螞蟻集團。Anthropic 必須保留 Anthropic。
+- 原文已有中文名稱時逐字保留，不得改寫或校正為其他名稱；例如新日興必須維持新日興。
+- 沒有把握時保留原文，絕不杜撰中文名稱。
+
+文風規則：
+- 使用台灣常用的財經詞，例如看多、看空、做多、做空、聯準會、財報、法說會、目標價、供應鏈。
+- 可用短段落提升可讀性，但不得加入摘要、標題、免責聲明、來源標示、hashtag 或自己的評論。
+- 忠實保留語氣、限定詞與不確定性；不得把推測寫成事實。
+- 只輸出翻譯結果，不要解釋翻譯選擇。
+- 不要使用 *、「、」、$ 字元；美元金額可改寫為「美元」。
+""".strip()
+
+
+def translate_to_zh(text: str):
+    """Return a Taiwan Traditional Chinese translation, or None on failure.
+
+    A failed OpenAI call leaves the post unprocessed for a later retry rather
+    than publishing a lower-quality machine translation.
     """
-    使用 Google Gemini REST API 將文字翻譯為繁體中文，並濾除特殊符號。
-    如果失敗，則使用免金鑰的 deep-translator 作為備用。
-    """
-    api_key = os.getenv("GEMINI_API_KEY")
-    translated_text = text
-    used_gemini = False
-    
-    if api_key and api_key != "your_gemini_api_key_here":
-        prompt = f"""
-        你是一個資深的財經社群媒體小編。請將以下這段來自國外財經網紅的推文，翻譯成流暢、自然、極具可讀性的台灣繁體中文。
-        
-        【翻譯與排版要求】
-        1. 語氣要生動自然，符合台灣社群平台的閱讀習慣，不要有生硬的機器翻譯感。
-        2. 請適當加入分段與空行，讓排版清晰易讀，絕對不要讓整坨文字擠在一起。
-        3. 這是財經/股市相關推文，請精準使用台灣的金融術語 (例如 Bear = 看空/熊市，Bull = 看多/牛市，Short = 做空，Long = 做多，Names = 個股/標的，Playbook = 劇本/策略)。
-
-        【公司與專有名詞：零容忍猜測】
-        1. 公司名、品牌名、人物名、產品名、股票代號、縮寫一律以原文保留，除非你能百分之百確定正式的台灣慣用譯名。
-        2. 絕不能把縮寫或相似拼字自行推測成另一家公司。例如 Ant 不可翻成螞蟻集團；提及 Anthropic 時，請保留 Anthropic。
-        3. 不確定的台灣公司名稱請保留英文原文，不可自行創造中文譯名。已經是中文的公司名稱必須原樣保留，例如新日興不可改寫成其他名稱。
-        
-        【嚴格規定】
-        1. 絕對不要在翻譯結果中使用這些符號：*, 「, 」, $
-        2. 請直接給出翻譯結果，不要加上任何解釋、問候語或註解。
-        3. 如果遇到原本是美金的數字，請改用中文寫法 (例如：100萬美金)，不要保留 $ 符號。
-        
-        【待翻譯原文】
-        {text}
-        """
-        
-        models_to_try = [
-            'gemini-3.6-flash',
-            'gemini-3.6-pro',
-            'gemini-4.0-flash', # 防患未然
-            'gemini-1.5-flash'  # 保留舊的當作備用
-        ]
-        
-        for model_name in models_to_try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}]
-            }
-            try:
-                res = requests.post(url, json=payload)
-                if res.status_code == 200:
-                    data = res.json()
-                    translated_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    used_gemini = True
-                    print(f"✅ 成功使用 {model_name} 進行 AI 翻譯！")
-                    break
-                else:
-                    print(f"嘗試模型 {model_name} 失敗，狀態碼: {res.status_code}, 回應: {res.text}")
-            except Exception as e:
-                print(f"嘗試模型 {model_name} 發生例外錯誤: {e}")
-                continue
-
-    # 如果 Gemini 完全失敗，啟動終極備用方案：Google Translate (免金鑰)
-    if not used_gemini or translated_text == text:
-        print("⚠️ Gemini 翻譯失敗，啟動 Google Translate 終極備用方案...")
-        try:
-            translated_text = GoogleTranslator(source='auto', target='zh-TW').translate(text)
-            # 檢查 deep-translator 是否抓到了 Google 的 500 錯誤網頁
-            if translated_text and ("Error 500 (Server Error)" in translated_text or "That’s an error" in translated_text or "That's an error" in translated_text):
-                print("Google Translate 回傳 500 伺服器錯誤，備用翻譯失敗。")
-                return None
-        except Exception as e:
-            print(f"終極備用方案也失敗: {e}")
-            return None
-            
-    if not translated_text:
+    if not text or not text.strip():
         return None
-            
-    # 雙重防線：程式碼層面強制移除不想要的符號
-    for char in ['*', '「', '」', '$']:
-        translated_text = translated_text.replace(char, '')
 
-    # 修正常見且風險極高的錯誤歸類；寧可保留原文也不能指向錯公司。
-    protected_terms = {
-        '螞蟻集團': 'Ant',
-        '蚂蚁集团': 'Ant',
-        '新祖盛': '新日興',
-    }
-    for wrong, correct in protected_terms.items():
-        if wrong in translated_text and ("Ant" in text or "Anthropic" in text or "新日興" in text):
-            translated_text = translated_text.replace(wrong, correct)
-    
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("缺少 OPENAI_API_KEY，略過翻譯並保留貼文供下次重試。")
+        return None
+
+    model = os.getenv("OPENAI_TRANSLATION_MODEL", "gpt-6-luna")
+    try:
+        response = OpenAI(api_key=api_key).responses.create(
+            model=model,
+            instructions=TRANSLATION_INSTRUCTIONS,
+            input=text,
+            max_output_tokens=1200,
+        )
+        translated_text = (response.output_text or "").strip()
+    except Exception as exc:
+        print(f"OpenAI 翻譯失敗（{model}）：{exc}")
+        return None
+
+    if not translated_text:
+        print("OpenAI 未回傳翻譯文字，保留貼文供下次重試。")
+        return None
+
+    for char in ("*", "「", "」", "$"):
+        translated_text = translated_text.replace(char, "")
+
+    print(f"✅ 已使用 OpenAI {model} 完成翻譯。")
     return translated_text
