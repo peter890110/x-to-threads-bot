@@ -1,8 +1,8 @@
-"""Translate source X posts with the OpenAI Responses API."""
+"""Translate source X posts with Gemini."""
 
 import os
 
-from openai import OpenAI
+import requests
 
 
 TRANSLATION_INSTRUCTIONS = """
@@ -28,36 +28,52 @@ TRANSLATION_INSTRUCTIONS = """
 def translate_to_zh(text: str):
     """Return a Taiwan Traditional Chinese translation, or None on failure.
 
-    A failed OpenAI call leaves the post unprocessed for a later retry rather
+    A failed Gemini call leaves the post unprocessed for a later retry rather
     than publishing a lower-quality machine translation.
     """
     if not text or not text.strip():
         return None
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        print("缺少 OPENAI_API_KEY，略過翻譯並保留貼文供下次重試。")
+        raise RuntimeError("缺少 GEMINI_API_KEY，請在 GitHub Secrets 與工作流程設定金鑰。")
         return None
 
-    model = os.getenv("OPENAI_TRANSLATION_MODEL", "gpt-6-luna")
+    model = os.getenv("GEMINI_TRANSLATION_MODEL") or "gemini-3.5-flash-lite"
     try:
-        response = OpenAI(api_key=api_key).responses.create(
-            model=model,
-            instructions=TRANSLATION_INSTRUCTIONS,
-            input=text,
-            max_output_tokens=1200,
+        response = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            headers={"x-goog-api-key": api_key},
+            json={
+                "systemInstruction": {"parts": [{"text": TRANSLATION_INSTRUCTIONS}]},
+                "contents": [{"role": "user", "parts": [{"text": text}]}],
+                "generationConfig": {"maxOutputTokens": 8192},
+            },
+            timeout=90,
         )
-        translated_text = (response.output_text or "").strip()
+        if response.status_code != 200:
+            # Do not log request URLs or exception messages containing secrets.
+            print(f"Gemini 翻譯失敗（{model}），HTTP {response.status_code}。")
+            return None
+        candidates = response.json().get("candidates", [])
+        if not candidates or candidates[0].get("finishReason") != "STOP":
+            print("Gemini 未完成翻譯，保留貼文供下次重試。")
+            return None
+        translated_text = "".join(
+            part.get("text", "")
+            for part in candidates[0].get("content", {}).get("parts", [])
+            if not part.get("thought")
+        ).strip()
     except Exception as exc:
-        print(f"OpenAI 翻譯失敗（{model}）：{exc}")
+        print(f"Gemini 翻譯失敗（{model}）：{type(exc).__name__}")
         return None
 
     if not translated_text:
-        print("OpenAI 未回傳翻譯文字，保留貼文供下次重試。")
+        print("Gemini 未回傳翻譯文字，保留貼文供下次重試。")
         return None
 
     for char in ("*", "「", "」", "$"):
         translated_text = translated_text.replace(char, "")
 
-    print(f"✅ 已使用 OpenAI {model} 完成翻譯。")
+    print(f"✅ 已使用 Gemini {model} 完成翻譯。")
     return translated_text
