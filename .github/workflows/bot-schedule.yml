@@ -1,26 +1,47 @@
 name: X to Threads Bot Scheduled Run
+
 on:
   schedule:
-    - cron: '0 22,9 * * *'
+    # 台北時間 09:00、16:00
+    - cron: '0 1,8 * * *'
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v4
-      with: {fetch-depth: 0}
-    - uses: actions/setup-python@v5
-      with: {python-version: '3.11'}
-    - run: pip install -r requirements.txt
-    - run: python -m playwright install --with-deps chromium
-    - name: Run Bot
-      env:
-        RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-        RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
-        THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
-        THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
-        TARGET_TWITTER_USERNAME: ${{ secrets.TARGET_TWITTER_USERNAME }}
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      run: python main.py
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+
+      - name: Run Bot
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          TARGET_TWITTER_USERNAME: ${{ secrets.TARGET_TWITTER_USERNAME }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python main.py
+
+      - name: Save processed-post state
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen_tweets.json generated_cards/
+          git diff --cached --quiet || (
+            git commit -m "chore: save bot state"
+            git push
+          )
