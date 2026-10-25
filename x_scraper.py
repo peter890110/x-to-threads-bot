@@ -92,6 +92,16 @@ def fetch_latest_tweets(username):
         # 第一步：過濾與整理所有貼文
         tweet_dict = {}
         for item in timeline_items:
+            if os.getenv("REQUIRE_ORIGINAL_AUTHOR") == "true":
+                author = item.get("author") or item.get("user") or item.get("user_info") or {}
+                screen_name = author.get("screen_name") if isinstance(author, dict) else None
+                screen_name = screen_name or item.get("screen_name")
+                if not screen_name or screen_name.lower() != username.lower():
+                    print(f"略過非本人或無法確認作者的貼文：{screen_name or 'unknown'}")
+                    continue
+                if item.get("retweeted_status") or item.get("retweet") or item.get("is_retweet") or extract_best_text(item).startswith("RT @"):
+                    print("略過轉推，只選本人原始發文。")
+                    continue
             tid = str(item.get("rest_id") or item.get("id") or item.get("tweet_id"))
             if not tid: continue
             
