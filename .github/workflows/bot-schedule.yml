@@ -5,6 +5,11 @@ on:
     # 台北時間 09:00、16:00
     - cron: '0 1,8 * * *'
   workflow_dispatch:
+    inputs:
+      target_username:
+        description: 'Optional account for a targeted original-author repost'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -32,7 +37,8 @@ jobs:
           RAPIDAPI_HOST: ${{ secrets.RAPIDAPI_HOST }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
-          TARGET_TWITTER_USERNAME: ${{ secrets.TARGET_TWITTER_USERNAME }}
+          TARGET_TWITTER_USERNAME: ${{ inputs.target_username || secrets.TARGET_TWITTER_USERNAME }}
+          REQUIRE_ORIGINAL_AUTHOR: ${{ inputs.target_username != '' && 'true' || 'false' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python main.py
 
