@@ -11,7 +11,8 @@ permissions:
 
 jobs:
   run-bot:
-    runs-on: ubuntu-latest
+    # Pin the OS because Playwright 1.52 does not support Ubuntu 26.04.
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
