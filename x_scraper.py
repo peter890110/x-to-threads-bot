@@ -1,6 +1,7 @@
 import requests
 import os
 import json
+import re
 
 def extract_media(obj):
     urls = []
@@ -93,14 +94,24 @@ def fetch_latest_tweets(username):
         tweet_dict = {}
         for item in timeline_items:
             if os.getenv("REQUIRE_ORIGINAL_AUTHOR") == "true":
+                if item.get("retweeted") or item.get("retweeted_tweet") or item.get("retweeted_status") or item.get("is_retweet") or extract_best_text(item).startswith("RT @"):
+                    print("略過轉推，只選本人原始發文。")
+                    continue
                 author = item.get("author") or item.get("user") or item.get("user_info") or {}
                 screen_name = author.get("screen_name") if isinstance(author, dict) else None
                 screen_name = screen_name or item.get("screen_name")
+                if not screen_name:
+                    source_id = item.get("rest_id") or item.get("id") or item.get("tweet_id")
+                    embed = requests.get("https://publish.twitter.com/oembed", params={"url": f"https://x.com/{username}/status/{source_id}"}, timeout=30)
+                    embed.raise_for_status()
+                    # oEmbed's author_url may name the retweeter; verify the
+                    # actual status author inside the official HTML instead.
+                    handles = re.findall(r'https://(?:x|twitter)\.com/([^/"<>]+)/status/', embed.json().get("html", ""))
+                    screen_name = handles[-1] if handles else None
                 if not screen_name or screen_name.lower() != username.lower():
                     print(f"略過非本人或無法確認作者的貼文：{screen_name or 'unknown'}")
-                    if not screen_name:
-                        print(f"作者資料：{item.get('author')}")
                     continue
+                print(f"已確認原始作者：@{screen_name}")
                 if item.get("retweeted_status") or item.get("retweet") or item.get("is_retweet") or extract_best_text(item).startswith("RT @"):
                     print("略過轉推，只選本人原始發文。")
                     continue
