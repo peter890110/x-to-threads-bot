@@ -98,6 +98,11 @@ def fetch_latest_tweets(username):
                 screen_name = screen_name or item.get("screen_name")
                 if not screen_name or screen_name.lower() != username.lower():
                     print(f"略過非本人或無法確認作者的貼文：{screen_name or 'unknown'}")
+                    if not screen_name:
+                        print(f"作者欄位診斷：{sorted(item.keys())}")
+                        for key, value in item.items():
+                            if isinstance(value, dict):
+                                print(f"子欄位 {key}: {sorted(value.keys())}")
                     continue
                 if item.get("retweeted_status") or item.get("retweet") or item.get("is_retweet") or extract_best_text(item).startswith("RT @"):
                     print("略過轉推，只選本人原始發文。")
