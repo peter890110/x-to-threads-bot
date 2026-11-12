@@ -5,6 +5,7 @@ from x_scraper import fetch_latest_tweets, get_mock_tweets
 from threads_poster import post_to_threads
 from state_manager import load_seen_tweets, is_tweet_processed, mark_tweet_processed
 from translator import translate_to_zh
+from content_policy import prioritize_accounts, rumor_signal
 from tweet_card import publish_card_to_github
 from x_screenshot import capture_x_post
 
@@ -152,7 +153,9 @@ def main():
         return
 
     # 支援使用逗號分隔多個帳號，例如 elonmusk,billgates,tim_cook
-    target_usernames = [u.strip() for u in target_usernames_str.split(",") if u.strip()]
+    target_usernames = prioritize_accounts(
+        [u.strip().lstrip("@") for u in target_usernames_str.split(",") if u.strip()]
+    )
     
     seen_tweets = load_seen_tweets()
     force_repost = os.getenv("FORCE_REPOST", "").lower() == "true"
@@ -193,6 +196,13 @@ def main():
                 
             if is_tweet_processed(tweet_id, seen_tweets) and not force_repost:
                 continue
+
+            # Editorial exclusions apply even when FORCE_REPOST is enabled.
+            signal = rumor_signal(tweet_text)
+            if signal:
+                print(f"略過傳聞貼文 (ID: {tweet_id})，原文訊號：{signal}")
+                seen_tweets = mark_tweet_processed(tweet_id, seen_tweets)
+                continue
                 
             if not is_within_last_6_hours(created_at) and not force_repost:
                 print(f"貼文 (ID: {tweet_id}) 太舊 (超過 6 小時)，跳過不搬運。")
@@ -218,6 +228,12 @@ def main():
             
             if not translated_text:
                 print(f"翻譯完全失敗 (ID: {tweet_id})，保留狀態下次重試。")
+                continue
+
+            signal = rumor_signal(translated_text)
+            if signal:
+                print(f"略過傳聞貼文 (ID: {tweet_id})，譯文訊號：{signal}")
+                seen_tweets = mark_tweet_processed(tweet_id, seen_tweets)
                 continue
             
             # 將長文章分段
